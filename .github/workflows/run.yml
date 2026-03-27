@@ -1,0 +1,32 @@
+name: Airport Runway Monitor
+
+on:
+  schedule:
+    # 5分おきに実行 (UTC時間なので、日本時間06:00-22:00は UTC 21:00-13:00)
+    # ※GitHub Actionsの無料枠では5分未満の指定は無視されることが多いので5分にしています
+    - cron: '*/5 21-23 * * *'
+    - cron: '*/5 0-12 * * *'
+  workflow_dispatch: # 手動実行ボタンも出します
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: os-actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run script
+        env:
+          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python main.py
