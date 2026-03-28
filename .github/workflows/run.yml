@@ -52,7 +52,7 @@ jobs:
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USERNAME }}
-          password: ${{ secrets.SFTP_PASSWORD }}
+          key: ${{ secrets.SFTP_KEY }}         # ← password ではなく key に変える！
           port: ${{ secrets.SFTP_PORT }}
           source: "upload/*,daily_upload/*"
           target: "/home/${{ secrets.SFTP_USERNAME }}/jrsaa.jp/public_html/runway_data/"
