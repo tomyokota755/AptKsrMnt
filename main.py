@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 LINE_ACCESS_TOKEN = os.getenv("LINE_ACCESS_TOKEN")
 LINE_USER_ID = os.getenv("LINE_USER_ID")
 
-# 判定エリアを拡大（5分間隔でも逃さない15〜20マイル設定）
 AREAS = {
     "新千歳": [{"range": [42.40, 42.75, 141.55, 141.95], "msg": "新千歳01L、01R"},{"range": [42.85, 43.20, 141.60, 142.00], "msg": "新千歳19L、19R"}],
     "成田": [{"range": [35.40, 35.75, 140.35, 140.75], "msg": "成田34L、34R"},{"range": [35.80, 36.15, 140.05, 140.45], "msg": "成田16L、16R"}],
@@ -37,19 +36,20 @@ def save_state(state):
         json.dump(state, f)
 
 def send_line(message):
+    # 正しいURLに修正しました
     url = "https://api.line.me/v2/bot/message/push"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"}
     data = {"to": LINE_USER_ID, "messages": [{"type": "text", "text": f"{message}に変わりました。"}]}
     try:
-        requests.post(url, headers=headers, json=data)
-    except:
-        pass
+        response = requests.post(url, headers=headers, json=data)
+        print(f"LINE Response: {response.status_code}")
+    except Exception as e:
+        print(f"LINE Error: {e}")
 
 def monitor():
     jst = timezone(timedelta(hours=9))
     now = datetime.now(jst)
     
-    # 6時台リセット
     if now.hour == 6 and now.minute < 10:
         current_state = {}
     else:
@@ -60,7 +60,12 @@ def monitor():
     params = {"lamin": 24.0, "lamax": 46.0, "lomin": 122.0, "lomax": 146.0}
     
     try:
-        res = requests.get(url, params=params, timeout=15).json()
+        response = requests.get(url, params=params, timeout=15)
+        if response.status_code != 200:
+            print(f"OpenSky API Error: {response.status_code}")
+            return
+            
+        res = response.json()
         states = res.get("states", [])
         if not states: return
 
@@ -70,13 +75,12 @@ def monitor():
             if any(v is None for v in [lat, lon, alt_m, vert_rate]): continue
             alt_ft = alt_m * 3.28084
 
-            # 3500ft以下で降下中
             if vert_rate < -0.5 and alt_ft < 3500:
                 for name, corridors in AREAS.items():
                     if name in detected_airports: continue
                     for corridor in corridors:
                         r = corridor["range"]
-                        # タイポ修正箇所
+                        # 正しい比較演算子に修正
                         if r[0] <= lat <= r[1] and r[2] <= lon <= r[3]:
                             if "track" in corridor and not (corridor["track"][0] <= track <= corridor["track"][1]):
                                 continue
@@ -93,7 +97,7 @@ def monitor():
             save_state(current_state)
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Monitor Error: {e}")
 
 if __name__ == "__main__":
     monitor()
