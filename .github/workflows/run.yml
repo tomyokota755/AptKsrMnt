@@ -2,9 +2,9 @@ name: Airport Runway Monitor
 
 on:
   schedule:
-    - cron: '*/5 21-23 * * *' # 日本時間 6時〜9時頃（5分おき）
-    - cron: '*/5 0-12 * * *'  # 日本時間 9時〜21時頃（5分おき）
-    - cron: '0 0 * * *'       # 日本時間 午前9時に毎日実行
+    - cron: '*/5 21-23 * * *' # 日本時間 6:00-9:00（5分おき）
+    - cron: '*/5 0-12 * * *'  # 日本時間 9:00-21:00（5分おき）
+    - cron: '0 0 * * *'       # 日本時間 午前9時に1回（日次バッチ）
   workflow_dispatch:
 
 jobs:
@@ -34,17 +34,24 @@ jobs:
         run: python main.py
 
       - name: Run Daily Batch
+        # 定期実行(9AM)または手動実行のときだけ動作
         if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
         run: python daily_batch.py
 
       - name: Commit state
+        # ここで競合エラーが出ても、次の「サーバー転送」を止めないための安全装置
+        continue-on-error: true 
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          if [ -f state.json ]; then
+          # 最新の変更（機長がブラウザで編集した分）を取り込んでから保存（競合回避）
+          git pull origin main --rebase
+          if [ -f state.json ] && [ -n "$(git status --porcelain state.json)" ]; then
             git add state.json
-            git commit -m "Update state" || echo "No changes"
+            git commit -m "Update state"
             git push origin main
+          else
+            echo "No changes to state.json"
           fi
 
       - name: Upload to Xserver via SFTP
@@ -52,8 +59,9 @@ jobs:
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USERNAME }}
-          key: ${{ secrets.SFTP_KEY }}         # ← password ではなく key に変える！
+          key: ${{ secrets.SFTP_KEY }}
           port: ${{ secrets.SFTP_PORT }}
+          # 監視ログと日次一括、両方のフォルダを転送
           source: "upload/*,daily_upload/*"
           target: "/home/${{ secrets.SFTP_USERNAME }}/jrsaa.jp/public_html/runway_data/"
           strip_components: 0
