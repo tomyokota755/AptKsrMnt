@@ -2,24 +2,22 @@ name: Airport Runway Monitor
 
 on:
   schedule:
-    # 5分おきに実行 (UTC時間なので、日本時間06:00-22:00は UTC 21:00-13:00)
     - cron: '*/5 21-23 * * *'
     - cron: '*/5 0-12 * * *'
-  workflow_dispatch: # 手動実行ボタン
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 書き込み権限を明示的に指定
     permissions:
-      contents: write
+      contents: write # 記憶ファイルの保存に必須
       
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # v3からv4に更新
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # v4からv5に更新
         with:
           python-version: '3.9'
 
@@ -38,9 +36,8 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          # state.jsonが存在する場合のみ追加して保存する
           if [ -f state.json ]; then
             git add state.json
             git commit -m "Update runway state" || echo "No changes to commit"
-            git push
+            git push origin main
           fi
