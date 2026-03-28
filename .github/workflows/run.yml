@@ -2,8 +2,9 @@ name: Airport Runway Monitor
 
 on:
   schedule:
-    - cron: '*/5 21-23 * * *'
-    - cron: '*/5 0-12 * * *'
+    - cron: '*/5 21-23 * * *' # 日本時間 6時〜9時頃（5分おき）
+    - cron: '*/5 0-12 * * *'  # 日本時間 9時〜21時頃（5分おき）
+    - cron: '0 0 * * *'       # 日本時間 午前9時に毎日実行
   workflow_dispatch:
 
 jobs:
@@ -14,30 +15,45 @@ jobs:
       
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4 # v4が最新です
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5 # v5が最新です
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install requests
 
-      - name: Run script
+      - name: Run Runway Monitor
         env:
           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python main.py
 
-      - name: Commit and push changes
+      - name: Run Daily Batch
+        if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
+        run: python daily_batch.py
+
+      - name: Commit state
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           if [ -f state.json ]; then
             git add state.json
-            git commit -m "Update runway state" || echo "No changes to commit"
+            git commit -m "Update state" || echo "No changes"
             git push origin main
           fi
+
+      - name: Upload to Xserver via SFTP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USERNAME }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          port: ${{ secrets.SFTP_PORT }}
+          source: "upload/*,daily_upload/*"
+          target: "/home/${{ secrets.SFTP_USERNAME }}/jrsaa.jp/public_html/runway_data/"
+          strip_components: 0
