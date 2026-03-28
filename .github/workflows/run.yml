@@ -10,14 +10,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 記憶ファイルの保存に必須
+      contents: write
       
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4 # v3からv4に更新
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5 # v4からv5に更新
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
